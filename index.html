@@ -136,6 +136,14 @@
     white-space:normal;
   }
 
+  /* 검색어와 일치하는 부분을 다른 색으로 강조 표시 */
+  mark.search-hl{
+    background:#ffe17a;
+    color:#7a4b00;
+    border-radius:2px;
+    padding:0;
+  }
+
   .filter-toggle-btn{
     display:flex;
     align-items:center;
@@ -464,6 +472,24 @@ const NEIS_KEY = "2652dd1c1da445c8aef448b305a1c88c";
 // 수목 데이터 JSON 경로 (같은 폴더에 tree-data.json을 함께 두세요)
 const TREE_DATA_URL = "./tree-data.json";
 
+// 통합운영학교(초·중·고 등을 함께 운영)는 학교숲사랑 자료엔 "OO초중고등학교"처럼
+// 하나로 합쳐 정리돼 있지만, 나이스에는 급별로 따로 등록돼 있어 이름이 일치하지 않습니다.
+// 아래는 "나이스에 실제로 등록된 학교명" → "tree-data.json 안의 학교명" 매칭 규칙입니다.
+const TREE_NAME_ALIASES = {
+  "인천경연초중학교(중등)": "인천경연초중학교",
+  "연평중학교": "연평초중고등학교",
+  "덕적중학교": "덕적초중고등학교",
+};
+
+// 나이스 학교명(s.name)에 해당하는 tree-data.json 키를 반환. 직접 일치 → 별칭 순으로 확인.
+function resolveTreeKey(neisName){
+  if(!TREE_DATA) return null;
+  if(TREE_DATA.schools[neisName]) return neisName;
+  const alias = TREE_NAME_ALIASES[neisName];
+  if(alias && TREE_DATA.schools[alias]) return alias;
+  return null;
+}
+
 const TYPE_META = {
   "elem":   { color: getCssVar("--c-elem"),   label: "초등학교" },
   "middle": { color: getCssVar("--c-middle"), label: "중학교" },
@@ -599,11 +625,14 @@ async function startDataLoad(){
 
     TREE_DATA = treeData;
 
-    allSchools = neisSchools.map(s => ({
-      lat: null, lng: null, marker: null,
-      treeInfo: (TREE_DATA && TREE_DATA.schools[s.name]) || null,
-      ...s,
-    }));
+    allSchools = neisSchools.map(s => {
+      const treeKey = resolveTreeKey(s.name);
+      return {
+        lat: null, lng: null, marker: null,
+        treeInfo: treeKey ? TREE_DATA.schools[treeKey] : null,
+        ...s,
+      };
+    });
 
     const TYPE_ORDER = Object.keys(TYPE_META);
     allSchools.sort((a, b) => {
@@ -648,8 +677,10 @@ function renderHeaderSummary(){
 // 좌표를 만들 수 없으므로 지도에는 표시하지 않고, 하단 안내에만 별도로 밝힙니다.
 function appendUnmatchedNotice(){
   if(!TREE_DATA) return;
-  const matchedNames = new Set(allSchools.filter(s=>s.treeInfo).map(s=>s.name));
-  const unmatched = Object.keys(TREE_DATA.schools).filter(n => !matchedNames.has(n));
+  const matchedKeys = new Set(
+    allSchools.map(s => resolveTreeKey(s.name)).filter(Boolean)
+  );
+  const unmatched = Object.keys(TREE_DATA.schools).filter(k => !matchedKeys.has(k));
   if(unmatched.length === 0) return;
   const div = document.createElement("div");
   div.style.marginTop = "8px";
@@ -812,7 +843,7 @@ function buildInfoContent(school, meta, homeLink, telHomeLine){
   if(t){
     const years = t.participating_years.join(", ");
     const chips = t.cumulative_species
-      .map(sp => `<span style="display:inline-block;background:var(--c-tree-light,#e6f1ea);color:#2f7d4f;border-radius:12px;padding:2px 8px;margin:2px 3px 3px 0;font-size:11px;white-space:nowrap;">${sp}</span>`)
+      .map(sp => `<span style="display:inline-block;background:var(--c-tree-light,#e6f1ea);color:#2f7d4f;border-radius:12px;padding:2px 8px;margin:2px 3px 3px 0;font-size:11px;white-space:nowrap;">${highlightMatch(sp, searchTerm)}</span>`)
       .join("");
 
     const addrWidth = Math.ceil(measureTextWidth(school.address, addressFont())) + 2; // 약간의 여유
@@ -875,6 +906,16 @@ function openInfo(school){
 
 function closeSchoolPopup(){
   if(activeOverlay) activeOverlay.setMap(null);
+}
+
+// 텍스트 안에서 현재 검색어와 일치하는 부분을 <mark>로 감싸 다른 색으로 강조합니다.
+function escapeRegExp(str){
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function highlightMatch(text, term){
+  if(!term || !text) return text;
+  const re = new RegExp(escapeRegExp(term), "g");
+  return text.replace(re, m => `<mark class="search-hl">${m}</mark>`);
 }
 
 // 검색어와 학교가 매칭되는지 판정 — 학교명과 보유 수목 종명만을 대상으로 검색합니다(주소 등은 제외).
@@ -981,7 +1022,7 @@ function renderList(){
 
     item.innerHTML = `
       <span class="tag" style="background:${meta.color}">${meta.label}</span>
-      <div class="name" style="display:inline">${school.name}</div>
+      <div class="name" style="display:inline">${highlightMatch(school.name, searchTerm)}</div>
       ${t ? `<span class="tree-badge">🌳 ${t.cumulative_species_count}종</span>` : ""}
       ${metaLine}
     `;
@@ -1030,14 +1071,14 @@ function updateSearchSummary(){
   }
   function schoolLine(s){
     return s.treeInfo
-      ? `${s.name} 보유수종 ${s.treeInfo.cumulative_species_count}종`
-      : `${s.name} (학교숲사랑 미참여교)`;
+      ? `${highlightMatch(s.name, searchTerm)} 보유수종 ${s.treeInfo.cumulative_species_count}종`
+      : `${highlightMatch(s.name, searchTerm)} (학교숲사랑 미참여교)`;
   }
 
   let lines = [];
 
   if(speciesMatches.length > 0){
-    lines = [ `${searchTerm} ${speciesMatches.length}개교, ${levelCountsText(speciesMatches)}` ];
+    lines = [ `<mark class="search-hl">${searchTerm}</mark> ${speciesMatches.length}개교, ${levelCountsText(speciesMatches)}` ];
   }else if(nameMatches.length === 1){
     lines = [ schoolLine(nameMatches[0]) ];
   }else if(nameMatches.length > 1 && nameMatches.length <= SUMMARY_MAX_SCHOOL_LINES){
@@ -1046,7 +1087,7 @@ function updateSearchSummary(){
   }else if(nameMatches.length > SUMMARY_MAX_SCHOOL_LINES){
     // "교"처럼 사실상 모든 학교명에 들어가는 흔한 글자로 검색하면 매칭 수가 매우 많아지므로,
     // 개별 나열 대신 수목 종명 검색과 동일한 집계 형식으로 보여줍니다.
-    lines = [ `${searchTerm} ${nameMatches.length}개교, ${levelCountsText(nameMatches)}` ];
+    lines = [ `<mark class="search-hl">${searchTerm}</mark> ${nameMatches.length}개교, ${levelCountsText(nameMatches)}` ];
   }else{
     lines = [ `'${searchTerm}' 검색 결과 없음` ];
   }
