@@ -795,7 +795,7 @@ function focusSchool(school){
 
 // 말풍선(정보창) 안에 보여줄 수목 목록 박스의 최대 세로 높이(px).
 // 이 높이를 넘으면 자동으로 세로 스크롤이 생깁니다.
-const TREE_BOX_MAX_HEIGHT = 130;
+const TREE_BOX_MAX_HEIGHT = 170;
 const TREE_BOX_MIN_WIDTH = 160; // 주소가 아주 짧아도 최소한의 너비는 보장
 
 // 주소 텍스트가 실제로 화면에서 차지하는 가로 폭(px)을, 지도 오버레이에 붙기 전에
@@ -831,7 +831,7 @@ function buildInfoContent(school, meta, homeLink, telHomeLine){
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e4e1d8;">
         <div style="font-size:12px;font-weight:700;color:#2f7d4f;">🌳 학교숲사랑 참여 · ${years}</div>
         <div style="font-size:11.5px;color:#555;margin:2px 0 5px;">누적 보유 수종 <b>${t.cumulative_species_count}종</b></div>
-        <div style="width:${boxWidth}px;box-sizing:border-box;max-height:${TREE_BOX_MAX_HEIGHT}px;overflow-y:auto;border:1px solid #e4e1d8;border-radius:8px;padding:6px 7px;background:#fafaf7;">
+        <div style="width:${boxWidth}px;box-sizing:border-box;max-height:${TREE_BOX_MAX_HEIGHT}px;overflow-y:auto;overflow-x:hidden;border:1px solid #e4e1d8;border-radius:8px;padding:6px 7px;background:#fafaf7;">
           ${chips}
         </div>
       </div>`;
