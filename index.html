@@ -477,7 +477,7 @@ function loadKakaoMaps(){
 }
 
 const INIT_CENTER = { lat: 37.5200, lng: 126.6900 };
-const INIT_LEVEL = 10;
+const INIT_LEVEL = 9;
 
 function initMap(){
   map = new kakao.maps.Map(document.getElementById("map"), {
@@ -720,8 +720,6 @@ function makeMarkerImage(color, isTree){
   });
 }
 
-let popupSeq = 0;
-
 function placeMarker(school){
   if(school.lat == null) return;
   const meta = TYPE_META[school.type];
@@ -741,7 +739,7 @@ function placeMarker(school){
 
   const content = buildInfoContent(school, meta, homeLink, telHomeLine);
 
-  kakao.maps.event.addListener(marker, "click", ()=> openInfo(marker, content));
+  kakao.maps.event.addListener(marker, "click", ()=> focusSchool(school));
 
   const supportsHover = window.matchMedia && window.matchMedia("(hover: hover)").matches;
   if(supportsHover){
@@ -754,26 +752,34 @@ function placeMarker(school){
   applyVisibility(school);
 }
 
+// 학교 선택(마커 클릭 / 리스트 클릭) 시 공통 동작: 해당 학교 주변으로 확대 + 정보창 오픈
+function focusSchool(school){
+  if(school.lat == null || !map) return;
+  const pos = new kakao.maps.LatLng(school.lat, school.lng);
+  map.setLevel(3);
+  map.setCenter(pos);
+  if(school.marker) openInfo(school.marker, school.infoContent);
+}
+
+// 말풍선(정보창) 안에 보여줄 수목 목록 박스의 최대 세로 높이(px).
+// 이 높이를 넘으면 자동으로 세로 스크롤이 생깁니다.
+const TREE_BOX_MAX_HEIGHT = 130;
+
 function buildInfoContent(school, meta, homeLink, telHomeLine){
   const t = school.treeInfo;
   let treeSection = "";
 
   if(t){
-    popupSeq += 1;
-    const bodyId = `tree-body-${popupSeq}`;
     const years = t.participating_years.join(", ");
     const chips = t.cumulative_species
-      .map(sp => `<span style="display:inline-block;background:var(--c-tree-light,#e6f1ea);color:#2f7d4f;border-radius:12px;padding:2px 8px;margin:2px 3px 0 0;font-size:11px;white-space:nowrap;">${sp}</span>`)
+      .map(sp => `<span style="display:inline-block;background:var(--c-tree-light,#e6f1ea);color:#2f7d4f;border-radius:12px;padding:2px 8px;margin:2px 3px 3px 0;font-size:11px;white-space:nowrap;">${sp}</span>`)
       .join("");
 
     treeSection = `
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e4e1d8;">
         <div style="font-size:12px;font-weight:700;color:#2f7d4f;">🌳 학교숲사랑 참여 · ${years}</div>
-        <div style="font-size:11.5px;color:#555;margin:2px 0 4px;">누적 보유 수종 <b>${t.cumulative_species_count}종</b></div>
-        <div style="cursor:pointer;font-size:11.5px;color:#2f7d4f;text-decoration:underline;" onclick="document.getElementById('${bodyId}').style.display = document.getElementById('${bodyId}').style.display==='none' ? 'block' : 'none';">
-          보유 수목 전체 보기
-        </div>
-        <div id="${bodyId}" style="display:none;max-width:260px;max-height:160px;overflow-y:auto;margin-top:6px;">
+        <div style="font-size:11.5px;color:#555;margin:2px 0 5px;">누적 보유 수종 <b>${t.cumulative_species_count}종</b></div>
+        <div style="max-width:260px;max-height:${TREE_BOX_MAX_HEIGHT}px;overflow-y:auto;border:1px solid #e4e1d8;border-radius:8px;padding:6px 7px;background:#fafaf7;">
           ${chips}
         </div>
       </div>`;
@@ -928,13 +934,7 @@ function renderList(){
       ${t ? `<span class="tree-badge">🌳 ${t.cumulative_species_count}종</span>` : ""}
       <div class="meta">${metaLine}</div>
     `;
-    item.addEventListener("click", ()=>{
-      if(school.lat == null) return;
-      const pos = new kakao.maps.LatLng(school.lat, school.lng);
-      map.setLevel(3);
-      map.setCenter(pos);
-      if(school.marker) openInfo(school.marker, school.infoContent);
-    });
+    item.addEventListener("click", ()=> focusSchool(school));
     wrap.appendChild(item);
   });
 }
@@ -975,6 +975,7 @@ function setSearchMode(mode){
   allSchools.forEach(applyVisibility);
   renderCounts();
   renderList();
+  fitToVisible();
 }
 document.getElementById("modeSchoolBtn").addEventListener("click", ()=> setSearchMode("school"));
 document.getElementById("modeSpeciesBtn").addEventListener("click", ()=> setSearchMode("species"));
@@ -984,10 +985,7 @@ document.getElementById("searchInput").addEventListener("input", (e)=>{
   allSchools.forEach(applyVisibility);
   renderCounts();
   renderList();
-
-  if(searchTerm === ""){
-    resetToInitialView();
-  }
+  fitToVisible();
 });
 
 function resetToInitialView(){
@@ -996,6 +994,26 @@ function resetToInitialView(){
   map.setCenter(new kakao.maps.LatLng(INIT_CENTER.lat, INIT_CENTER.lng));
   if(activeInfoWindow) activeInfoWindow.close();
   hideHover();
+}
+
+// 검색 결과가 지도에서 두드러지도록, 검색어가 있으면 매칭된 학교들이 모두
+// 화면에 들어오게 지도를 자동으로 확대/이동합니다.
+function fitToVisible(){
+  if(!map) return;
+  if(!searchTerm){
+    resetToInitialView();
+    return;
+  }
+  const visible = visibleSchools().filter(s => s.lat != null);
+  if(visible.length === 0) return;
+  if(visible.length === 1){
+    map.setLevel(3);
+    map.setCenter(new kakao.maps.LatLng(visible[0].lat, visible[0].lng));
+    return;
+  }
+  const bounds = new kakao.maps.LatLngBounds();
+  visible.forEach(s => bounds.extend(new kakao.maps.LatLng(s.lat, s.lng)));
+  map.setBounds(bounds);
 }
 
 loadKakaoMaps();
