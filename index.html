@@ -518,6 +518,7 @@ const SUMMARY_MAX_SCHOOL_LINES = 6;      // 검색 요약에서 학교별로 나
 let map;
 let geocoder;
 let activeOverlay = null;      // 학교 클릭 시 여는 설명 팝업(마커에서 살짝 떨어진 위치에 표시)
+let activeSchoolName = null;   // 현재 말풍선이 열려있는 학교명(같은 학교를 다시 누르면 토글로 닫기 위함)
 let allSchools = [];
 let activeFilters = new Set(Object.keys(TYPE_META));
 let searchTerm = "";
@@ -818,13 +819,19 @@ function placeMarker(school){
   applyVisibility(school);
 }
 
-// 학교 선택(마커 클릭 / 리스트 클릭) 시 공통 동작: 해당 학교 주변으로 확대 + 설명 팝업 오픈
+// 학교 선택(마커 클릭 / 리스트 클릭) 시 공통 동작: 해당 학교 주변으로 확대 + 설명 팝업 오픈.
+// 이미 같은 학교의 말풍선이 열려 있는 상태에서 다시 누르면 말풍선을 닫습니다(토글).
 function focusSchool(school){
   if(school.lat == null || !map) return;
+  if(activeSchoolName === school.name){
+    closeSchoolPopup();
+    return;
+  }
   const pos = new kakao.maps.LatLng(school.lat, school.lng);
   map.setLevel(3);
   map.setCenter(pos);
   openInfo(school);
+  activeSchoolName = school.name;
 }
 
 // 주소 텍스트가 실제로 화면에서 차지하는 가로 폭(px)을, 지도 오버레이에 붙기 전에
@@ -913,6 +920,7 @@ function openInfo(school){
 
 function closeSchoolPopup(){
   if(activeOverlay) activeOverlay.setMap(null);
+  activeSchoolName = null;
 }
 
 // 말풍선 안 수목 목록 박스에 포커스가 있을 때 좌우 화살표 키로 가로 스크롤 이동.
