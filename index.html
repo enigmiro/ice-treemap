@@ -117,6 +117,21 @@
     color:var(--muted);
     margin-top:6px;
   }
+  .search-summary{
+    margin-top:6px;
+  }
+  .search-summary-line{
+    font-weight:700;
+    color:var(--c-tree);
+    white-space:nowrap;
+    overflow:hidden;
+    margin-top:2px;
+  }
+  .search-summary-line:first-child{margin-top:0;}
+  .search-summary-line.more{
+    font-weight:600;
+    color:var(--muted);
+  }
 
   .filter-toggle-btn{
     display:flex;
@@ -312,6 +327,7 @@
           <input id="searchInput" type="text" placeholder="🏫 학교명 또는 🌳 수목 종명으로 검색">
         </div>
         <div class="search-hint" id="searchHint">학교명과 수목 종명을 한 번에 검색합니다. (예: "부평초", "느티나무")</div>
+        <div class="search-summary" id="searchSummary" style="display:none;"></div>
 
         <button type="button" id="filterToggleBtn" class="filter-toggle-btn">
           <span id="filterSummary">필터: 참여교만 · 초·중·고 전체</span>
@@ -603,6 +619,7 @@ async function startDataLoad(){
     renderCounts();
     renderList();
     updateFilterSummary();
+    updateSearchSummary();
   }catch(err){
     console.error(err);
     statusBar.textContent = "데이터를 불러오는 중 오류가 발생했습니다: " + err.message;
@@ -878,6 +895,80 @@ function effectiveOnlyParticipating(){
   return onlyParticipating;
 }
 
+// 검색창 아래에 검색 종류에 맞는 요약을 보여줍니다.
+// - 수목 종명으로 매칭된 학교가 있으면:      "느티나무 12개교, 초 9교, 중 2교, 고 1교" (한 줄)
+// - 학교명으로 1개교만 매칭되면:            "인천OO초등학교 보유수종 38종" (한 줄)
+// - 학교명으로 여러 개교가 매칭되면(부평초/부일초 등): 학교마다 줄을 바꿔서
+//   "학교명 보유수종 N종"을 각각 표시합니다.
+const SUMMARY_MAX_SCHOOL_LINES = 6; // 너무 많은 학교가 매칭될 때 표시할 최대 줄 수
+
+function updateSearchSummary(){
+  const hintEl = document.getElementById("searchHint");
+  const sumEl = document.getElementById("searchSummary");
+
+  if(!searchTerm){
+    hintEl.style.display = "";
+    sumEl.style.display = "none";
+    sumEl.innerHTML = "";
+    return;
+  }
+
+  hintEl.style.display = "none";
+  sumEl.style.display = "block";
+
+  const visible = visibleSchools();
+  const speciesMatches = visible.filter(s => matchedSpeciesList(s).length > 0);
+  const nameMatches = visible.filter(s => matchesSearchByName(s));
+
+  function levelCountsText(list){
+    const c = { elem:0, middle:0, high:0 };
+    list.forEach(s => { if(c[s.type] !== undefined) c[s.type]++; });
+    return `초 ${c.elem}교, 중 ${c.middle}교, 고 ${c.high}교`;
+  }
+  function schoolLine(s){
+    return s.treeInfo
+      ? `${s.name} 보유수종 ${s.treeInfo.cumulative_species_count}종`
+      : `${s.name} (학교숲사랑 미참여교)`;
+  }
+
+  let lines = [];
+  let moreLine = null;
+
+  if(speciesMatches.length > 0){
+    lines = [ `${searchTerm} ${speciesMatches.length}개교, ${levelCountsText(speciesMatches)}` ];
+  }else if(nameMatches.length === 1){
+    lines = [ schoolLine(nameMatches[0]) ];
+  }else if(nameMatches.length > 1){
+    lines = nameMatches.slice(0, SUMMARY_MAX_SCHOOL_LINES).map(schoolLine);
+    if(nameMatches.length > SUMMARY_MAX_SCHOOL_LINES){
+      moreLine = `외 ${nameMatches.length - SUMMARY_MAX_SCHOOL_LINES}개교 더`;
+    }
+  }else{
+    lines = [ `'${searchTerm}' 검색 결과 없음` ];
+  }
+
+  sumEl.innerHTML = lines.map(t => `<div class="search-summary-line">${t}</div>`).join("")
+    + (moreLine ? `<div class="search-summary-line more">${moreLine}</div>` : "");
+
+  sumEl.querySelectorAll(".search-summary-line").forEach(fitTextToWidth);
+}
+
+// 요약 줄이 항상 컨테이너 폭 안에서 줄바꿈 없이 보이도록, 들어가는 폭에 맞춰
+// 글자 크기를 자동으로 줄여줍니다.
+function fitTextToWidth(el){
+  const text = el.textContent;
+  const maxWidth = el.clientWidth - 2;
+  if(!text || maxWidth <= 0) return;
+  const family = getComputedStyle(document.body).fontFamily;
+  const sizes = [13, 12.5, 12, 11.5, 11, 10.5, 10, 9.5, 9, 8.5, 8];
+  let chosen = sizes[sizes.length - 1];
+  for(const size of sizes){
+    const w = measureTextWidth(text, `700 ${size}px ${family}`);
+    if(w <= maxWidth){ chosen = size; break; }
+  }
+  el.style.fontSize = chosen + "px";
+}
+
 function applyVisibility(school){
   if(!school.marker) return;
   const matchesFilter = activeFilters.has(school.type);
@@ -1000,6 +1091,7 @@ document.querySelectorAll('input[type="checkbox"][data-type]').forEach(cb=>{
     renderCounts();
     renderList();
     updateFilterSummary();
+    updateSearchSummary();
   });
 });
 
@@ -1009,6 +1101,7 @@ document.getElementById("onlyParticipating").addEventListener("change", (e)=>{
   renderCounts();
   renderList();
   updateFilterSummary();
+  updateSearchSummary();
 });
 
 document.getElementById("searchInput").addEventListener("input", (e)=>{
@@ -1016,6 +1109,7 @@ document.getElementById("searchInput").addEventListener("input", (e)=>{
   allSchools.forEach(applyVisibility);
   renderCounts();
   renderList();
+  updateSearchSummary();
   fitToVisible();
 });
 
