@@ -491,7 +491,6 @@ let searchTerm = "";
 let searchMode = "school";           // "school" | "species"
 let onlyParticipating = true;
 let neisLoadFailed = false;
-let hoverOverlay = null;
 let TREE_DATA = null;                // tree-data.json 파싱 결과
 let treeLoadFailed = false;
 
@@ -780,12 +779,6 @@ function placeMarker(school){
 
   kakao.maps.event.addListener(marker, "click", ()=> focusSchool(school));
 
-  const supportsHover = window.matchMedia && window.matchMedia("(hover: hover)").matches;
-  if(supportsHover){
-    kakao.maps.event.addListener(marker, "mouseover", ()=> showHover(school));
-    kakao.maps.event.addListener(marker, "mouseout",  ()=> hideHover());
-  }
-
   school.marker = marker;
   school.infoContent = content;
   applyVisibility(school);
@@ -818,7 +811,7 @@ function buildInfoContent(school, meta, homeLink, telHomeLine){
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e4e1d8;">
         <div style="font-size:12px;font-weight:700;color:#2f7d4f;">🌳 학교숲사랑 참여 · ${years}</div>
         <div style="font-size:11.5px;color:#555;margin:2px 0 5px;">누적 보유 수종 <b>${t.cumulative_species_count}종</b></div>
-        <div style="max-width:260px;max-height:${TREE_BOX_MAX_HEIGHT}px;overflow-y:auto;border:1px solid #e4e1d8;border-radius:8px;padding:6px 7px;background:#fafaf7;">
+        <div style="width:100%;box-sizing:border-box;max-height:${TREE_BOX_MAX_HEIGHT}px;overflow-y:auto;border:1px solid #e4e1d8;border-radius:8px;padding:6px 7px;background:#fafaf7;">
           ${chips}
         </div>
       </div>`;
@@ -832,46 +825,6 @@ function buildInfoContent(school, meta, homeLink, telHomeLine){
       ${telHomeLine}
       ${treeSection}
     </div>`;
-}
-
-function showHover(school){
-  const meta = TYPE_META[school.type];
-  const t = school.treeInfo;
-  const html = `
-    <div style="
-      margin-left:16px;
-      background:#ffffff;
-      border:1px solid #cfd6dd;
-      border-left:4px solid ${t ? getCssVar('--c-tree') : meta.color};
-      border-radius:8px;
-      box-shadow:0 2px 8px rgba(0,0,0,.18);
-      padding:8px 12px;
-      font-family:inherit;
-      font-size:12px;
-      line-height:1.55;
-      white-space:nowrap;
-      pointer-events:none;
-    ">
-      <div style="font-weight:700;font-size:13px;">${school.name}${t ? " 🌳" : ""}</div>
-      <div style="color:#555;">${meta.label}${school.found ? " · " + school.found : ""}</div>
-      <div style="color:#777;">${school.address}</div>
-      ${t ? `<div style="color:#2f7d4f;font-weight:600;margin-top:2px;">보유 수종 ${t.cumulative_species_count}종</div>` : ""}
-    </div>`;
-  if(!hoverOverlay){
-    hoverOverlay = new kakao.maps.CustomOverlay({
-      zIndex: 20,
-      xAnchor: 0,
-      yAnchor: 0.5,
-      clickable: false,
-    });
-  }
-  hoverOverlay.setContent(html);
-  hoverOverlay.setPosition(new kakao.maps.LatLng(school.lat, school.lng));
-  hoverOverlay.setMap(map);
-}
-
-function hideHover(){
-  if(hoverOverlay) hoverOverlay.setMap(null);
 }
 
 // 학교 설명 팝업을 마커 바로 위가 아니라, 마커에서 살짝 떨어진 위치에 띄웁니다.
@@ -1097,7 +1050,6 @@ function resetToInitialView(){
   map.setLevel(INIT_LEVEL);
   map.setCenter(new kakao.maps.LatLng(INIT_CENTER.lat, INIT_CENTER.lng));
   closeSchoolPopup();
-  hideHover();
 }
 
 // 검색 결과가 지도에서 두드러지도록, 검색어가 있으면 매칭된 학교들이 모두
