@@ -584,6 +584,7 @@ function getCssVar(name){
 const INIT_CENTER = { lat: 37.5200, lng: 126.6900 };
 const INIT_LEVEL = 9;                    // 초기 화면 확대 정도(값이 작을수록 더 확대됨)
 const POPUP_GAP = 22;                    // 마커와 설명 팝업 사이 연결선 길이(px)
+const POPUP_MIN_WIDTH = 250;             // 학교 설명 말풍선의 최소 가로 폭(px)
 const TREE_BOX_MAX_HEIGHT = 170;         // 팝업 안 수목 목록 박스 최대 세로 높이(px)
 const TREE_BOX_MIN_WIDTH = 160;          // 수목 목록 박스 최소 가로 폭(px)
 const SUMMARY_MAX_SCHOOL_LINES = 6;      // 검색 요약에서 학교별로 나열할 최대 줄 수
@@ -1000,6 +1001,8 @@ function openInfo(school){
         border:1px solid #cfd6dd;
         border-radius:10px;
         box-shadow:0 4px 16px rgba(0,0,0,.2);
+        min-width:${POPUP_MIN_WIDTH}px;
+        box-sizing:border-box;
       ">
         <button onclick="closeSchoolPopup()" aria-label="닫기" style="
           position:absolute;top:2px;right:4px;
