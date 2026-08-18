@@ -112,28 +112,6 @@
   }
   .search-box input:focus{outline:2px solid var(--c-tree);outline-offset:1px;}
 
-  .segmented{
-    display:flex;
-    margin-top:8px;
-    border:1px solid var(--line);
-    border-radius:8px;
-    overflow:hidden;
-  }
-  .segmented button{
-    flex:1;
-    border:none;
-    background:var(--paper-2);
-    padding:7px 4px;
-    font-size:12.5px;
-    color:var(--muted);
-    cursor:pointer;
-    font-family:inherit;
-  }
-  .segmented button.active{
-    background:var(--c-tree);
-    color:#fff;
-    font-weight:700;
-  }
   .search-hint{
     font-size:11px;
     color:var(--muted);
@@ -331,13 +309,9 @@
     <aside>
       <div class="panel search-panel">
         <div class="search-box">
-          <input id="searchInput" type="text" placeholder="학교명으로 검색">
+          <input id="searchInput" type="text" placeholder="🏫 학교명 또는 🌳 수목 종명으로 검색">
         </div>
-        <div class="segmented">
-          <button type="button" id="modeSchoolBtn" class="active">🏫 학교명 검색</button>
-          <button type="button" id="modeSpeciesBtn">🌳 수목 종명 검색</button>
-        </div>
-        <div class="search-hint" id="searchHint">학교숲사랑 참여교 180개교 중에서 검색합니다.</div>
+        <div class="search-hint" id="searchHint">학교명과 수목 종명을 한 번에 검색합니다. (예: "부평초", "느티나무")</div>
 
         <button type="button" id="filterToggleBtn" class="filter-toggle-btn">
           <span id="filterSummary">필터: 참여교만 · 초·중·고 전체</span>
@@ -488,7 +462,6 @@ let activeOverlay = null;      // 학교 클릭 시 여는 설명 팝업(마커�
 let allSchools = [];
 let activeFilters = new Set(Object.keys(TYPE_META));
 let searchTerm = "";
-let searchMode = "school";           // "school" | "species"
 let onlyParticipating = true;
 let neisLoadFailed = false;
 let TREE_DATA = null;                // tree-data.json 파싱 결과
@@ -888,19 +861,21 @@ function closeSchoolPopup(){
   if(activeOverlay) activeOverlay.setMap(null);
 }
 
-// 검색어와 학교가 매칭되는지 판정 (검색 모드에 따라 학교명 또는 수목 종명 검색)
-function matchesSearch(school){
-  if(!searchTerm) return true;
-  if(searchMode === "species"){
-    if(!school.treeInfo) return false;
-    return school.treeInfo.cumulative_species.some(sp => sp.includes(searchTerm));
-  }
+// 검색어와 학교가 매칭되는지 판정 — 학교명과 보유 수목 종명을 동시에 검색합니다.
+function matchesSearchByName(school){
   return school.name.includes(searchTerm);
 }
+function matchedSpeciesList(school){
+  if(!searchTerm || !school.treeInfo) return [];
+  return school.treeInfo.cumulative_species.filter(sp => sp.includes(searchTerm));
+}
+function matchesSearch(school){
+  if(!searchTerm) return true;
+  return matchesSearchByName(school) || matchedSpeciesList(school).length > 0;
+}
 
-// 수목 종명 검색 모드에서는 참여교만 의미가 있으므로 항상 참여교만 대상으로 함
 function effectiveOnlyParticipating(){
-  return onlyParticipating || searchMode === "species";
+  return onlyParticipating;
 }
 
 function applyVisibility(school){
@@ -970,9 +945,9 @@ function renderList(){
     // 평소엔 이름만 슬림하게 보여주고, 검색 중일 때만 주소/매칭 정보를 추가로 보여줍니다.
     let metaLine = "";
     if(searchTerm){
-      if(searchMode === "species" && t){
-        const hitCount = t.cumulative_species.filter(sp=>sp.includes(searchTerm)).length;
-        metaLine = `<div class="meta">${school.address} · <span class="sp-hit">'${searchTerm}' 포함 종 ${hitCount}개</span></div>`;
+      const spHits = matchedSpeciesList(school);
+      if(spHits.length > 0){
+        metaLine = `<div class="meta">${school.address} · <span class="sp-hit">🌳 '${searchTerm}' 포함 종 ${spHits.length}개</span></div>`;
       }else{
         metaLine = `<div class="meta">${school.address}</div>`;
       }
@@ -1035,27 +1010,6 @@ document.getElementById("onlyParticipating").addEventListener("change", (e)=>{
   renderList();
   updateFilterSummary();
 });
-
-function setSearchMode(mode){
-  searchMode = mode;
-  document.getElementById("modeSchoolBtn").classList.toggle("active", mode === "school");
-  document.getElementById("modeSpeciesBtn").classList.toggle("active", mode === "species");
-  const input = document.getElementById("searchInput");
-  const hint = document.getElementById("searchHint");
-  if(mode === "species"){
-    input.placeholder = "수목 종명으로 검색 (예: 느티나무)";
-    hint.textContent = "학교숲사랑 참여교가 보유한 수목 종명을 검색합니다. 참여교만 표시됩니다.";
-  }else{
-    input.placeholder = "학교명으로 검색";
-    hint.textContent = "인천 전체 초·중·고 학교명을 검색합니다.";
-  }
-  allSchools.forEach(applyVisibility);
-  renderCounts();
-  renderList();
-  fitToVisible();
-}
-document.getElementById("modeSchoolBtn").addEventListener("click", ()=> setSearchMode("school"));
-document.getElementById("modeSpeciesBtn").addEventListener("click", ()=> setSearchMode("species"));
 
 document.getElementById("searchInput").addEventListener("input", (e)=>{
   searchTerm = e.target.value.trim();
