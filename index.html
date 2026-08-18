@@ -484,7 +484,7 @@ function getCssVar(name){
 
 let map;
 let geocoder;
-let activeInfoWindow = null;
+let activeOverlay = null;      // 학교 클릭 시 여는 설명 팝업(마커에서 살짝 떨어진 위치에 표시)
 let allSchools = [];
 let activeFilters = new Set(Object.keys(TYPE_META));
 let searchTerm = "";
@@ -797,7 +797,7 @@ function focusSchool(school){
   const pos = new kakao.maps.LatLng(school.lat, school.lng);
   map.setLevel(3);
   map.setCenter(pos);
-  if(school.marker) openInfo(school.marker, school.infoContent);
+  openInfo(school);
 }
 
 // 말풍선(정보창) 안에 보여줄 수목 목록 박스의 최대 세로 높이(px).
@@ -874,12 +874,45 @@ function hideHover(){
   if(hoverOverlay) hoverOverlay.setMap(null);
 }
 
-function openInfo(marker, content){
-  if(!activeInfoWindow){
-    activeInfoWindow = new kakao.maps.InfoWindow({ removable: true });
+// 학교 설명 팝업을 마커 바로 위가 아니라, 마커에서 살짝 떨어진 위치에 띄웁니다.
+// 얇은 연결선으로 어느 학교의 설명인지는 알 수 있게 하되, 팝업이 마커를 가리지 않게 합니다.
+const POPUP_GAP = 22; // 마커와 팝업 사이 간격(px)
+
+function openInfo(school){
+  if(!school.marker) return;
+  if(!activeOverlay){
+    activeOverlay = new kakao.maps.CustomOverlay({
+      zIndex: 30,
+      xAnchor: 0.5,
+      yAnchor: 1,
+      clickable: true,
+    });
   }
-  activeInfoWindow.setContent(content);
-  activeInfoWindow.open(map, marker);
+  const wrapped = `
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div style="
+        position:relative;
+        background:#ffffff;
+        border:1px solid #cfd6dd;
+        border-radius:10px;
+        box-shadow:0 4px 16px rgba(0,0,0,.2);
+      ">
+        <button onclick="closeSchoolPopup()" aria-label="닫기" style="
+          position:absolute;top:2px;right:4px;
+          border:none;background:transparent;
+          font-size:15px;color:#8a8a8a;cursor:pointer;line-height:1;padding:4px;
+        ">×</button>
+        ${school.infoContent}
+      </div>
+      <div style="width:2px;height:${POPUP_GAP}px;background:#b9c1cb;"></div>
+    </div>`;
+  activeOverlay.setContent(wrapped);
+  activeOverlay.setPosition(new kakao.maps.LatLng(school.lat, school.lng));
+  activeOverlay.setMap(map);
+}
+
+function closeSchoolPopup(){
+  if(activeOverlay) activeOverlay.setMap(null);
 }
 
 // 검색어와 학교가 매칭되는지 판정 (검색 모드에 따라 학교명 또는 수목 종명 검색)
@@ -1063,7 +1096,7 @@ function resetToInitialView(){
   if(!map) return;
   map.setLevel(INIT_LEVEL);
   map.setCenter(new kakao.maps.LatLng(INIT_CENTER.lat, INIT_CENTER.lng));
-  if(activeInfoWindow) activeInfoWindow.close();
+  closeSchoolPopup();
   hideHover();
 }
 
