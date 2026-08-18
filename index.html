@@ -328,7 +328,21 @@
     font-weight:700;
     color:var(--ink);
     margin-bottom:4px;
+    padding-right:20px;
   }
+  .unmatched-popover .popover-close{
+    position:absolute;
+    top:6px;
+    right:6px;
+    border:none;
+    background:transparent;
+    font-size:15px;
+    color:#8a8a8a;
+    cursor:pointer;
+    line-height:1;
+    padding:4px;
+  }
+  .unmatched-popover .popover-close:hover{color:var(--ink);}
   .unmatched-popover .popover-desc{
     color:var(--muted);
     margin-bottom:8px;
@@ -765,11 +779,16 @@ function appendUnmatchedNotice(){
 
   const popover = document.getElementById("unmatchedPopover");
   popover.innerHTML = `
+    <button type="button" class="popover-close" aria-label="닫기" onclick="closeUnmatchedPopover()">×</button>
     <div class="popover-title">지도에 표시되지 않는 참여 기관 · ${unmatched.length}곳</div>
     <div class="popover-desc">유치원·체험학습장·교육원 등은 나이스 초·중·고 학교기본정보 API 범위 밖이라 좌표를 만들 수 없어 지도에는 표시되지 않습니다.</div>
     <ul>
       ${unmatched.map(k => `<li>${k} — 보유수종 <b>${TREE_DATA.schools[k].cumulative_species_count}종</b></li>`).join("")}
     </ul>`;
+}
+
+function closeUnmatchedPopover(){
+  document.getElementById("unmatchedPopover").style.display = "none";
 }
 
 function updateHeaderStat(text){
