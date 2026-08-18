@@ -144,6 +144,13 @@
     padding:0;
   }
 
+  /* 말풍선 안 수목 목록 박스: 포커스 시(키보드 화살표 이동 가능) 테두리로 표시 */
+  .tree-box:focus,
+  .tree-box:focus-visible{
+    outline:2px solid var(--c-tree);
+    outline-offset:1px;
+  }
+
   .filter-toggle-btn{
     display:flex;
     align-items:center;
@@ -853,7 +860,7 @@ function buildInfoContent(school, meta, homeLink, telHomeLine){
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e4e1d8;">
         <div style="font-size:12px;font-weight:700;color:#2f7d4f;">🌳 학교숲사랑 참여 · ${years}</div>
         <div style="font-size:11.5px;color:#555;margin:2px 0 5px;">누적 보유 수종 <b>${t.cumulative_species_count}종</b></div>
-        <div style="width:${boxWidth}px;box-sizing:border-box;max-height:${TREE_BOX_MAX_HEIGHT}px;overflow-y:auto;overflow-x:auto;border:1px solid #e4e1d8;border-radius:8px;padding:6px 7px;background:#fafaf7;">
+        <div class="tree-box" tabindex="0" onkeydown="scrollTreeBoxOnArrow(event, this)" style="width:${boxWidth}px;box-sizing:border-box;max-height:${TREE_BOX_MAX_HEIGHT}px;overflow-y:auto;overflow-x:auto;border:1px solid #e4e1d8;border-radius:8px;padding:6px 7px;background:#fafaf7;">
           ${chips}
         </div>
       </div>`;
@@ -906,6 +913,19 @@ function openInfo(school){
 
 function closeSchoolPopup(){
   if(activeOverlay) activeOverlay.setMap(null);
+}
+
+// 말풍선 안 수목 목록 박스에 포커스가 있을 때 좌우 화살표 키로 가로 스크롤 이동.
+// (세로 스크롤은 위/아래 화살표로 브라우저 기본 동작이 그대로 적용됩니다.)
+function scrollTreeBoxOnArrow(e, el){
+  const STEP = 60; // 한 번 누를 때 이동하는 픽셀 양
+  if(e.key === "ArrowRight"){
+    el.scrollLeft += STEP;
+    e.preventDefault();
+  }else if(e.key === "ArrowLeft"){
+    el.scrollLeft -= STEP;
+    e.preventDefault();
+  }
 }
 
 // 텍스트 안에서 현재 검색어와 일치하는 부분을 <mark>로 감싸 다른 색으로 강조합니다.
