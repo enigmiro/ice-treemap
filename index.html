@@ -131,6 +131,10 @@
     font-weight:600;
     color:var(--muted);
   }
+  .search-summary-line.ambiguous{
+    color:#946200;
+    white-space:normal;
+  }
 
   .filter-toggle-btn{
     display:flex;
@@ -881,8 +885,19 @@ function matchedSpeciesList(school){
   if(!searchTerm || !school.treeInfo) return [];
   return school.treeInfo.cumulative_species.filter(sp => sp.includes(searchTerm));
 }
+
+// 검색어가 학교명과 수목 종명 양쪽 모두에 걸쳐 매칭되면(둘 중 하나로 특정할 수 없으면)
+// 모호한 검색으로 간주합니다. 이 경우 검색 결과를 보여주지 않고 별도 안내만 표시합니다.
+function isSearchAmbiguous(){
+  if(!searchTerm) return false;
+  const hasNameMatch = allSchools.some(matchesSearchByName);
+  const hasSpeciesMatch = allSchools.some(s => matchedSpeciesList(s).length > 0);
+  return hasNameMatch && hasSpeciesMatch;
+}
+
 function matchesSearch(school){
   if(!searchTerm) return true;
+  if(isSearchAmbiguous()) return false;
   return matchesSearchByName(school) || matchedSpeciesList(school).length > 0;
 }
 
@@ -995,6 +1010,12 @@ function updateSearchSummary(){
 
   hintEl.style.display = "none";
   sumEl.style.display = "block";
+
+  if(isSearchAmbiguous()){
+    sumEl.innerHTML = `<div class="search-summary-line ambiguous">학교명과 수목종명을 특정할 수 없습니다</div>`;
+    sumEl.querySelectorAll(".search-summary-line").forEach(fitTextToWidth);
+    return;
+  }
 
   const visible = visibleSchools();
   const speciesMatches = visible.filter(s => matchedSpeciesList(s).length > 0);
