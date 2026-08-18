@@ -995,8 +995,10 @@ function renderList(){
 ============================================================= */
 // - 수목 종명으로 매칭된 학교가 있으면:      "느티나무 12개교, 초 9교, 중 2교, 고 1교" (한 줄)
 // - 학교명으로 1개교만 매칭되면:            "인천OO초등학교 보유수종 38종" (한 줄)
-// - 학교명으로 여러 개교가 매칭되면(부평초/부일초 등): 학교마다 줄을 바꿔서
+// - 학교명으로 2~6개교가 매칭되면(부평초/부일초 등): 학교마다 줄을 바꿔서
 //   "학교명 보유수종 N종"을 각각 표시합니다.
+// - 학교명으로 6개교를 초과해 매칭되면("교"처럼 흔한 글자 등): 개별 나열 대신
+//   수목 종명 검색과 동일한 집계 형식("교 155개교, 초 ○교, 중 ○교, 고 ○교")으로 표시합니다.
 function updateSearchSummary(){
   const hintEl = document.getElementById("searchHint");
   const sumEl = document.getElementById("searchSummary");
@@ -1033,23 +1035,23 @@ function updateSearchSummary(){
   }
 
   let lines = [];
-  let moreLine = null;
 
   if(speciesMatches.length > 0){
     lines = [ `${searchTerm} ${speciesMatches.length}개교, ${levelCountsText(speciesMatches)}` ];
   }else if(nameMatches.length === 1){
     lines = [ schoolLine(nameMatches[0]) ];
-  }else if(nameMatches.length > 1){
-    lines = nameMatches.slice(0, SUMMARY_MAX_SCHOOL_LINES).map(schoolLine);
-    if(nameMatches.length > SUMMARY_MAX_SCHOOL_LINES){
-      moreLine = `외 ${nameMatches.length - SUMMARY_MAX_SCHOOL_LINES}개교 더`;
-    }
+  }else if(nameMatches.length > 1 && nameMatches.length <= SUMMARY_MAX_SCHOOL_LINES){
+    // 매칭된 학교가 적을 때만(예: "부평초" → 부평초/부일초 등) 학교별로 한 줄씩 나열합니다.
+    lines = nameMatches.map(schoolLine);
+  }else if(nameMatches.length > SUMMARY_MAX_SCHOOL_LINES){
+    // "교"처럼 사실상 모든 학교명에 들어가는 흔한 글자로 검색하면 매칭 수가 매우 많아지므로,
+    // 개별 나열 대신 수목 종명 검색과 동일한 집계 형식으로 보여줍니다.
+    lines = [ `${searchTerm} ${nameMatches.length}개교, ${levelCountsText(nameMatches)}` ];
   }else{
     lines = [ `'${searchTerm}' 검색 결과 없음` ];
   }
 
-  sumEl.innerHTML = lines.map(t => `<div class="search-summary-line">${t}</div>`).join("")
-    + (moreLine ? `<div class="search-summary-line more">${moreLine}</div>` : "");
+  sumEl.innerHTML = lines.map(t => `<div class="search-summary-line">${t}</div>`).join("");
 
   sumEl.querySelectorAll(".search-summary-line").forEach(fitTextToWidth);
 }
