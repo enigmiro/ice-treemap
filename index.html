@@ -140,6 +140,36 @@
     margin-top:6px;
   }
 
+  .filter-toggle-btn{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+    margin-top:10px;
+    padding:8px 10px;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:8px;
+    font-family:inherit;
+    font-size:12px;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .filter-toggle-btn:hover{background:#efece2;}
+  .filter-toggle-btn .chevron{
+    color:var(--muted);
+    transition:transform .15s ease;
+    margin-left:8px;
+  }
+  .filter-toggle-btn .chevron.open{transform:rotate(180deg);}
+
+  .filter-panels{
+    display:none;
+    border-bottom:1px solid var(--line);
+  }
+  .filter-panels.open{display:block;}
+  .filter-panels .panel:last-child{border-bottom:none;}
+
   .filter-title{
     font-size:11px;
     letter-spacing:.08em;
@@ -190,13 +220,14 @@
     min-height:0;
   }
   .list-item{
-    padding:13px 18px;
+    padding:8px 18px;
     border-bottom:1px solid var(--line);
     cursor:pointer;
+    line-height:1.5;
   }
   .list-item:hover{background:var(--paper);}
-  .list-item .name{font-size:13.5px;font-weight:600;}
-  .list-item .meta{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .list-item .name{font-size:13px;font-weight:600;}
+  .list-item .meta{font-size:11px;color:var(--muted);margin-top:1px;}
   .list-item .meta .sp-hit{color:var(--c-tree);font-weight:600;}
   .tag{
     display:inline-block;
@@ -298,7 +329,7 @@
 
   <div class="layout">
     <aside>
-      <div class="panel">
+      <div class="panel search-panel">
         <div class="search-box">
           <input id="searchInput" type="text" placeholder="학교명으로 검색">
         </div>
@@ -307,49 +338,56 @@
           <button type="button" id="modeSpeciesBtn">🌳 수목 종명 검색</button>
         </div>
         <div class="search-hint" id="searchHint">학교숲사랑 참여교 180개교 중에서 검색합니다.</div>
+
+        <button type="button" id="filterToggleBtn" class="filter-toggle-btn">
+          <span id="filterSummary">필터: 참여교만 · 초·중·고 전체</span>
+          <span class="chevron" id="filterChevron">▾</span>
+        </button>
       </div>
 
-      <div class="panel">
-        <div class="filter-title">학교숲사랑 수목현황</div>
-        <label class="filter-row tree-row">
-          <input type="checkbox" id="onlyParticipating" checked>
-          <span class="swatch" style="background:var(--c-tree)"></span>
-          참여교만 지도에 표시
-          <span class="count" id="cnt-tree">0</span>
-        </label>
-      </div>
-
-      <div class="panel">
-        <div class="filter-title">학교급 / 설립유형</div>
-
-        <div class="level-block">
-          <label class="filter-row">
-            <input type="checkbox" data-type="elem" checked>
-            <span class="swatch" style="background:var(--c-elem)"></span>
-            초등학교
-            <span class="count" id="cnt-elem">0</span>
+      <div class="filter-panels" id="filterPanels">
+        <div class="panel">
+          <div class="filter-title">학교숲사랑 수목현황</div>
+          <label class="filter-row tree-row">
+            <input type="checkbox" id="onlyParticipating" checked>
+            <span class="swatch" style="background:var(--c-tree)"></span>
+            참여교만 지도에 표시
+            <span class="count" id="cnt-tree">0</span>
           </label>
-          <div class="office-breakdown" id="brk-elem"></div>
         </div>
 
-        <div class="level-block">
-          <label class="filter-row">
-            <input type="checkbox" data-type="middle" checked>
-            <span class="swatch" style="background:var(--c-middle)"></span>
-            중학교
-            <span class="count" id="cnt-middle">0</span>
-          </label>
-          <div class="office-breakdown" id="brk-middle"></div>
-        </div>
+        <div class="panel">
+          <div class="filter-title">학교급 / 설립유형</div>
 
-        <div class="level-block">
-          <label class="filter-row">
-            <input type="checkbox" data-type="high" checked>
-            <span class="swatch" style="background:var(--c-high)"></span>
-            고등학교
-            <span class="count" id="cnt-high">0</span>
-          </label>
-          <div class="office-breakdown" id="brk-high"></div>
+          <div class="level-block">
+            <label class="filter-row">
+              <input type="checkbox" data-type="elem" checked>
+              <span class="swatch" style="background:var(--c-elem)"></span>
+              초등학교
+              <span class="count" id="cnt-elem">0</span>
+            </label>
+            <div class="office-breakdown" id="brk-elem"></div>
+          </div>
+
+          <div class="level-block">
+            <label class="filter-row">
+              <input type="checkbox" data-type="middle" checked>
+              <span class="swatch" style="background:var(--c-middle)"></span>
+              중학교
+              <span class="count" id="cnt-middle">0</span>
+            </label>
+            <div class="office-breakdown" id="brk-middle"></div>
+          </div>
+
+          <div class="level-block">
+            <label class="filter-row">
+              <input type="checkbox" data-type="high" checked>
+              <span class="swatch" style="background:var(--c-high)"></span>
+              고등학교
+              <span class="count" id="cnt-high">0</span>
+            </label>
+            <div class="office-breakdown" id="brk-high"></div>
+          </div>
         </div>
       </div>
 
@@ -592,6 +630,7 @@ async function startDataLoad(){
     appendUnmatchedNotice();
     renderCounts();
     renderList();
+    updateFilterSummary();
   }catch(err){
     console.error(err);
     statusBar.textContent = "데이터를 불러오는 중 오류가 발생했습니다: " + err.message;
@@ -922,22 +961,52 @@ function renderList(){
     const item = document.createElement("div");
     item.className = "list-item";
 
-    let metaLine = school.address;
-    if(searchMode === "species" && t && searchTerm){
-      const hitCount = t.cumulative_species.filter(sp=>sp.includes(searchTerm)).length;
-      metaLine = `${school.address} · <span class="sp-hit">'${searchTerm}' 포함 종 ${hitCount}개</span>`;
+    // 평소엔 이름만 슬림하게 보여주고, 검색 중일 때만 주소/매칭 정보를 추가로 보여줍니다.
+    let metaLine = "";
+    if(searchTerm){
+      if(searchMode === "species" && t){
+        const hitCount = t.cumulative_species.filter(sp=>sp.includes(searchTerm)).length;
+        metaLine = `<div class="meta">${school.address} · <span class="sp-hit">'${searchTerm}' 포함 종 ${hitCount}개</span></div>`;
+      }else{
+        metaLine = `<div class="meta">${school.address}</div>`;
+      }
     }
 
     item.innerHTML = `
       <span class="tag" style="background:${meta.color}">${meta.label}</span>
       <div class="name" style="display:inline">${school.name}</div>
       ${t ? `<span class="tree-badge">🌳 ${t.cumulative_species_count}종</span>` : ""}
-      <div class="meta">${metaLine}</div>
+      ${metaLine}
     `;
     item.addEventListener("click", ()=> focusSchool(school));
     wrap.appendChild(item);
   });
 }
+
+/* ============================================================
+   6-1. 필터 패널 접기/펼치기 + 요약 텍스트
+============================================================= */
+let filtersOpen = false;
+
+function toggleFilterPanel(force){
+  filtersOpen = (typeof force === "boolean") ? force : !filtersOpen;
+  document.getElementById("filterPanels").classList.toggle("open", filtersOpen);
+  document.getElementById("filterChevron").classList.toggle("open", filtersOpen);
+}
+
+function updateFilterSummary(){
+  const typeLabels = { elem:"초", middle:"중", high:"고" };
+  const activeTypeLabels = Object.keys(TYPE_META)
+    .filter(t => activeFilters.has(t))
+    .map(t => typeLabels[t]);
+  const typeText = activeTypeLabels.length === 3
+    ? "초·중·고 전체"
+    : (activeTypeLabels.length === 0 ? "선택 없음" : activeTypeLabels.join("·"));
+  const participationText = onlyParticipating ? "참여교만" : "전체 학교";
+  document.getElementById("filterSummary").textContent = `필터: ${participationText} · ${typeText}`;
+}
+
+document.getElementById("filterToggleBtn").addEventListener("click", ()=> toggleFilterPanel());
 
 /* ============================================================
    6. 이벤트 바인딩
@@ -949,6 +1018,7 @@ document.querySelectorAll('input[type="checkbox"][data-type]').forEach(cb=>{
     allSchools.filter(s=>s.type===type).forEach(applyVisibility);
     renderCounts();
     renderList();
+    updateFilterSummary();
   });
 });
 
@@ -957,6 +1027,7 @@ document.getElementById("onlyParticipating").addEventListener("change", (e)=>{
   allSchools.forEach(applyVisibility);
   renderCounts();
   renderList();
+  updateFilterSummary();
 });
 
 function setSearchMode(mode){
