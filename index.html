@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>인천 에듀맵(Edu-Map)</title>
+<title>인천 학교 수목지도</title>
 
 <!-- ============================================================
   카카오맵 JavaScript API 로드
@@ -29,6 +29,9 @@
     --c-elem:#2563a6;
     --c-middle:#a6672a;
     --c-high:#8b3a52;
+    --c-tree:#2f7d4f;
+    --c-tree-light:#e6f1ea;
+    --c-off:#9aa1ac;
   }
 
   *{box-sizing:border-box;}
@@ -53,7 +56,7 @@
     display:flex;
     align-items:baseline;
     gap:14px;
-    border-bottom:3px solid var(--c-elem);
+    border-bottom:3px solid var(--c-tree);
   }
   header .eyebrow{
     font-size:11px;
@@ -71,6 +74,8 @@
     margin-left:auto;
     font-size:12px;
     color:#c7d2e3;
+    text-align:right;
+    line-height:1.5;
   }
   header .stat b{color:#fff;}
 
@@ -105,7 +110,35 @@
     font-size:16px;
     background:var(--paper);
   }
-  .search-box input:focus{outline:2px solid var(--c-elem);outline-offset:1px;}
+  .search-box input:focus{outline:2px solid var(--c-tree);outline-offset:1px;}
+
+  .segmented{
+    display:flex;
+    margin-top:8px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .segmented button{
+    flex:1;
+    border:none;
+    background:var(--paper-2);
+    padding:7px 4px;
+    font-size:12.5px;
+    color:var(--muted);
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .segmented button.active{
+    background:var(--c-tree);
+    color:#fff;
+    font-weight:700;
+  }
+  .search-hint{
+    font-size:11px;
+    color:var(--muted);
+    margin-top:6px;
+  }
 
   .filter-title{
     font-size:11px;
@@ -127,6 +160,7 @@
     user-select:none;
   }
   .filter-row input{accent-color:var(--navy-2);width:20px;height:20px;cursor:pointer;}
+  .filter-row.tree-row input{accent-color:var(--c-tree);}
   .swatch{
     width:11px;height:11px;border-radius:50%;flex:none;
   }
@@ -163,6 +197,7 @@
   .list-item:hover{background:var(--paper);}
   .list-item .name{font-size:13.5px;font-weight:600;}
   .list-item .meta{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .list-item .meta .sp-hit{color:var(--c-tree);font-weight:600;}
   .tag{
     display:inline-block;
     font-size:10.5px;
@@ -171,6 +206,17 @@
     color:#fff;
     margin-right:5px;
     font-weight:600;
+  }
+  .tree-badge{
+    display:inline-block;
+    font-size:10.5px;
+    padding:1px 7px 1px 5px;
+    border-radius:20px;
+    color:var(--c-tree);
+    background:var(--c-tree-light);
+    margin-left:5px;
+    font-weight:700;
+    white-space:nowrap;
   }
 
   #map{width:100%;height:100%;}
@@ -197,9 +243,10 @@
     padding:12px 18px 16px;
     font-size:11.5px;
     color:var(--muted);
-    line-height:1.5;
+    line-height:1.55;
   }
-  .legend-note a{color:var(--c-elem);}
+  .legend-note a{color:var(--c-tree);}
+  .legend-note .warn{color:#946200;}
 
   ::-webkit-scrollbar{width:8px;}
   ::-webkit-scrollbar-thumb{background:#d8d4c8;border-radius:8px;}
@@ -215,6 +262,10 @@
     header h1 span{
       display:block;
       margin-top:2px;
+    }
+    header .stat{
+      margin-left:0;
+      text-align:left;
     }
     .layout{
       grid-template-columns:1fr;
@@ -239,8 +290,8 @@
 <div class="app">
   <header>
     <div>
-      <div class="eyebrow">INCHEON METROPOLITAN OFFICE OF EDUCATION</div>
-      <h1><a href="/" onclick="location.reload(); return false;" style="color:inherit;text-decoration:none;cursor:pointer;">인천 에듀맵(Edu-Map)</a> <span style="font-weight:400;font-size:12px;color:#9fb0c9;">인천광역시 전역 · 남부·북부·동부·서부·강화교육지원청</span></h1>
+      <div class="eyebrow">인천 학교숲사랑 전문적학습공동체 &middot; 2019~2026-1학기</div>
+      <h1><a href="/" onclick="location.reload(); return false;" style="color:inherit;text-decoration:none;cursor:pointer;">인천 학교 수목지도</a> <span style="font-weight:400;font-size:12px;color:#9fb0c9;">인천광역시 전역 · 남부·북부·동부·서부·강화교육지원청</span></h1>
     </div>
     <div class="stat" id="headerStat">데이터 불러오는 중…</div>
   </header>
@@ -251,6 +302,21 @@
         <div class="search-box">
           <input id="searchInput" type="text" placeholder="학교명으로 검색">
         </div>
+        <div class="segmented">
+          <button type="button" id="modeSchoolBtn" class="active">🏫 학교명 검색</button>
+          <button type="button" id="modeSpeciesBtn">🌳 수목 종명 검색</button>
+        </div>
+        <div class="search-hint" id="searchHint">학교숲사랑 참여교 180개교 중에서 검색합니다.</div>
+      </div>
+
+      <div class="panel">
+        <div class="filter-title">학교숲사랑 수목현황</div>
+        <label class="filter-row tree-row">
+          <input type="checkbox" id="onlyParticipating" checked>
+          <span class="swatch" style="background:var(--c-tree)"></span>
+          참여교만 지도에 표시
+          <span class="count" id="cnt-tree">0</span>
+        </label>
       </div>
 
       <div class="panel">
@@ -289,8 +355,9 @@
 
       <div class="list-wrap" id="listWrap"></div>
 
-      <div class="legend-note">
-        자료 출처: 나이스 교육정보 개방 포털 (인천광역시 전역 · 남부·북부·동부·서부·강화교육지원청)
+      <div class="legend-note" id="legendNote">
+        자료 출처: 나이스 교육정보 개방 포털(학교 위치·기본정보), 학교숲사랑 교원 전문적학습공동체(수목 현황, 2019~2026-1학기)<br>
+        <span class="warn">⚠ 수목 목록은 학교별 표찰(이름표) 제작을 위해 정리한 자료로, 그루 수·둘레 등 정량 조사값이 아닙니다.</span>
       </div>
     </aside>
 
@@ -364,6 +431,9 @@ function officeKeyFromAddress(addr){
 // ------------------------------------------------------------
 const NEIS_KEY = "2652dd1c1da445c8aef448b305a1c88c";
 
+// 수목 데이터 JSON 경로 (같은 폴더에 tree-data.json을 함께 두세요)
+const TREE_DATA_URL = "./tree-data.json";
+
 const TYPE_META = {
   "elem":   { color: getCssVar("--c-elem"),   label: "초등학교" },
   "middle": { color: getCssVar("--c-middle"), label: "중학교" },
@@ -380,8 +450,12 @@ let activeInfoWindow = null;
 let allSchools = [];
 let activeFilters = new Set(Object.keys(TYPE_META));
 let searchTerm = "";
+let searchMode = "school";           // "school" | "species"
+let onlyParticipating = true;
 let neisLoadFailed = false;
 let hoverOverlay = null;
+let TREE_DATA = null;                // tree-data.json 파싱 결과
+let treeLoadFailed = false;
 
 /* ============================================================
    2. 카카오맵 로드
@@ -416,7 +490,7 @@ function initMap(){
 }
 
 /* ============================================================
-   3. 나이스 학교기본정보 API — 초/중/고
+   3. 나이스 학교기본정보 API (초/중/고) + 수목현황 JSON
 ============================================================= */
 async function fetchNeisSchools(){
   const keyParam = NEIS_KEY ? `&KEY=${encodeURIComponent(NEIS_KEY)}` : "";
@@ -441,6 +515,12 @@ async function fetchNeisSchools(){
     .filter(s => s.type);
 }
 
+async function fetchTreeData(){
+  const res = await fetch(TREE_DATA_URL);
+  if(!res.ok) throw new Error("tree-data.json 로드 실패: " + res.status);
+  return res.json();
+}
+
 function isPlannedSchool(r){
   const name = r.SCHUL_NM || "";
   if(name.includes("가칭") || name.includes("개교예정")) return true;
@@ -463,20 +543,31 @@ function schoolKindToType(kind){
 }
 
 /* ============================================================
-   4. 전체 로드 & 지오코딩
+   4. 전체 로드 & 지오코딩 & 수목데이터 매칭
 ============================================================= */
 async function startDataLoad(){
   const statusBar = document.getElementById("statusBar");
   try{
     statusBar.textContent = "나이스 API에서 초·중·고 정보를 불러오는 중…";
-    const neisSchools = await fetchNeisSchools().catch(err=>{
-      console.error(err);
-      neisLoadFailed = true;
-      return [];
-    });
+
+    const [neisSchools, treeData] = await Promise.all([
+      fetchNeisSchools().catch(err=>{
+        console.error(err);
+        neisLoadFailed = true;
+        return [];
+      }),
+      fetchTreeData().catch(err=>{
+        console.error(err);
+        treeLoadFailed = true;
+        return null;
+      }),
+    ]);
+
+    TREE_DATA = treeData;
 
     allSchools = neisSchools.map(s => ({
       lat: null, lng: null, marker: null,
+      treeInfo: (TREE_DATA && TREE_DATA.schools[s.name]) || null,
       ...s,
     }));
 
@@ -492,16 +583,44 @@ async function startDataLoad(){
 
     if(neisLoadFailed){
       statusBar.textContent = "⚠️ 나이스(초·중·고) 호출 실패 — NEIS_KEY 확인";
+    }else if(treeLoadFailed){
+      statusBar.textContent = "⚠️ tree-data.json을 불러오지 못했습니다. index.html과 같은 폴더에 있는지 확인하세요.";
     }else{
       statusBar.classList.add("hidden");
     }
-    updateHeaderStat(`총 ${allSchools.length}개 기관 표시 중`);
+    renderHeaderSummary();
+    appendUnmatchedNotice();
     renderCounts();
     renderList();
   }catch(err){
     console.error(err);
     statusBar.textContent = "데이터를 불러오는 중 오류가 발생했습니다: " + err.message;
   }
+}
+
+function renderHeaderSummary(){
+  const treeSchools = allSchools.filter(s => s.treeInfo);
+  const totalSpecies = TREE_DATA ? TREE_DATA.meta.total_unique_species_all_years : 0;
+  updateHeaderStat(
+    `전체 ${allSchools.length}개교 &middot; <b>학교숲사랑 참여 ${treeSchools.length}개교</b><br>` +
+    `참여교 누적 수종 <b>${totalSpecies}종</b> (2019~2026-1학기)`
+  );
+}
+
+// 수목현황 데이터의 학교명이 나이스 초·중·고 목록에서 매칭되지 않는 항목
+// (유치원, 체험학습장, 교육원 등 — 나이스 schoolInfo API 대상 범위 밖)은
+// 좌표를 만들 수 없으므로 지도에는 표시하지 않고, 하단 안내에만 별도로 밝힙니다.
+function appendUnmatchedNotice(){
+  if(!TREE_DATA) return;
+  const matchedNames = new Set(allSchools.filter(s=>s.treeInfo).map(s=>s.name));
+  const unmatched = Object.keys(TREE_DATA.schools).filter(n => !matchedNames.has(n));
+  if(unmatched.length === 0) return;
+  const note = document.getElementById("legendNote");
+  const div = document.createElement("div");
+  div.style.marginTop = "8px";
+  div.innerHTML = `지도에 표시되지 않는 참여 기관 (${unmatched.length}곳 · 유치원·체험학습장 등은 나이스 초·중·고 API 범위 밖): ` +
+    unmatched.map(n=>`<span style="white-space:nowrap;">${n}</span>`).join(", ");
+  document.getElementById("legendNote").appendChild(div);
 }
 
 function updateHeaderStat(text){
@@ -583,17 +702,25 @@ function geocodeWithRetry(address, callback){
 }
 
 /* ============================================================
-   5. 마커 / 리스트 / 필터
+   5. 마커 / 정보창 / 리스트 / 필터
 ============================================================= */
-function makeMarkerImage(color){
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18">
-    <circle cx="9" cy="9" r="7" fill="${color}" stroke="#ffffff" stroke-width="2"/>
+function makeMarkerImage(color, isTree){
+  const r = isTree ? 8 : 6;
+  const ring = isTree
+    ? `<circle cx="10" cy="10" r="9" fill="none" stroke="${getCssVar('--c-tree')}" stroke-width="1.6"/>`
+    : "";
+  const opacity = isTree ? 1 : 0.55;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+    ${ring}
+    <circle cx="10" cy="10" r="${r}" fill="${color}" fill-opacity="${opacity}" stroke="#ffffff" stroke-width="2"/>
   </svg>`;
   const src = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
-  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(18,18), {
-    offset: new kakao.maps.Point(9,9)
+  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(20,20), {
+    offset: new kakao.maps.Point(10,10)
   });
 }
+
+let popupSeq = 0;
 
 function placeMarker(school){
   if(school.lat == null) return;
@@ -602,7 +729,7 @@ function placeMarker(school){
     position: new kakao.maps.LatLng(school.lat, school.lng),
     map,
     title: school.name,
-    image: makeMarkerImage(meta.color),
+    image: makeMarkerImage(meta.color, !!school.treeInfo),
   });
 
   const homeLink = school.homepage
@@ -611,13 +738,8 @@ function placeMarker(school){
   const telHomeLine = (school.tel || homeLink)
     ? `<div style="font-size:12px;color:#555;white-space:nowrap;margin-top:2px;">${school.tel || ""}${(school.tel && homeLink) ? "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" : ""}${homeLink}</div>`
     : "";
-  const content = `
-    <div style="font-family:inherit;padding:10px 14px;">
-      <div style="font-weight:700;font-size:14px;margin-bottom:4px;white-space:nowrap;">${school.name}</div>
-      <div style="font-size:12px;color:#555;margin-bottom:2px;white-space:nowrap;">${meta.label}${school.found ? " · " + school.found : ""}</div>
-      <div style="font-size:12px;color:#555;margin-bottom:2px;white-space:nowrap;">${school.address}</div>
-      ${telHomeLine}
-    </div>`;
+
+  const content = buildInfoContent(school, meta, homeLink, telHomeLine);
 
   kakao.maps.event.addListener(marker, "click", ()=> openInfo(marker, content));
 
@@ -632,14 +754,50 @@ function placeMarker(school){
   applyVisibility(school);
 }
 
+function buildInfoContent(school, meta, homeLink, telHomeLine){
+  const t = school.treeInfo;
+  let treeSection = "";
+
+  if(t){
+    popupSeq += 1;
+    const bodyId = `tree-body-${popupSeq}`;
+    const years = t.participating_years.join(", ");
+    const chips = t.cumulative_species
+      .map(sp => `<span style="display:inline-block;background:var(--c-tree-light,#e6f1ea);color:#2f7d4f;border-radius:12px;padding:2px 8px;margin:2px 3px 0 0;font-size:11px;white-space:nowrap;">${sp}</span>`)
+      .join("");
+
+    treeSection = `
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e4e1d8;">
+        <div style="font-size:12px;font-weight:700;color:#2f7d4f;">🌳 학교숲사랑 참여 · ${years}</div>
+        <div style="font-size:11.5px;color:#555;margin:2px 0 4px;">누적 보유 수종 <b>${t.cumulative_species_count}종</b></div>
+        <div style="cursor:pointer;font-size:11.5px;color:#2f7d4f;text-decoration:underline;" onclick="document.getElementById('${bodyId}').style.display = document.getElementById('${bodyId}').style.display==='none' ? 'block' : 'none';">
+          보유 수목 전체 보기
+        </div>
+        <div id="${bodyId}" style="display:none;max-width:260px;max-height:160px;overflow-y:auto;margin-top:6px;">
+          ${chips}
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div style="font-family:inherit;padding:10px 14px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;white-space:nowrap;">${school.name}${t ? ' <span style="color:#2f7d4f;">🌳</span>' : ''}</div>
+      <div style="font-size:12px;color:#555;margin-bottom:2px;white-space:nowrap;">${meta.label}${school.found ? " · " + school.found : ""}</div>
+      <div style="font-size:12px;color:#555;margin-bottom:2px;white-space:nowrap;">${school.address}</div>
+      ${telHomeLine}
+      ${treeSection}
+    </div>`;
+}
+
 function showHover(school){
   const meta = TYPE_META[school.type];
+  const t = school.treeInfo;
   const html = `
     <div style="
       margin-left:16px;
       background:#ffffff;
       border:1px solid #cfd6dd;
-      border-left:4px solid ${meta.color};
+      border-left:4px solid ${t ? getCssVar('--c-tree') : meta.color};
       border-radius:8px;
       box-shadow:0 2px 8px rgba(0,0,0,.18);
       padding:8px 12px;
@@ -649,9 +807,10 @@ function showHover(school){
       white-space:nowrap;
       pointer-events:none;
     ">
-      <div style="font-weight:700;font-size:13px;">${school.name}</div>
+      <div style="font-weight:700;font-size:13px;">${school.name}${t ? " 🌳" : ""}</div>
       <div style="color:#555;">${meta.label}${school.found ? " · " + school.found : ""}</div>
       <div style="color:#777;">${school.address}</div>
+      ${t ? `<div style="color:#2f7d4f;font-weight:600;margin-top:2px;">보유 수종 ${t.cumulative_species_count}종</div>` : ""}
     </div>`;
   if(!hoverOverlay){
     hoverOverlay = new kakao.maps.CustomOverlay({
@@ -678,17 +837,46 @@ function openInfo(marker, content){
   activeInfoWindow.open(map, marker);
 }
 
+// 검색어와 학교가 매칭되는지 판정 (검색 모드에 따라 학교명 또는 수목 종명 검색)
+function matchesSearch(school){
+  if(!searchTerm) return true;
+  if(searchMode === "species"){
+    if(!school.treeInfo) return false;
+    return school.treeInfo.cumulative_species.some(sp => sp.includes(searchTerm));
+  }
+  return school.name.includes(searchTerm);
+}
+
+// 수목 종명 검색 모드에서는 참여교만 의미가 있으므로 항상 참여교만 대상으로 함
+function effectiveOnlyParticipating(){
+  return onlyParticipating || searchMode === "species";
+}
+
 function applyVisibility(school){
   if(!school.marker) return;
   const matchesFilter = activeFilters.has(school.type);
-  const matchesSearch = !searchTerm || school.name.includes(searchTerm);
-  school.marker.setMap((matchesFilter && matchesSearch) ? map : null);
+  const matchesParticipation = !effectiveOnlyParticipating() || !!school.treeInfo;
+  school.marker.setMap((matchesFilter && matchesParticipation && matchesSearch(school)) ? map : null);
+}
+
+function visibleSchools(){
+  return allSchools.filter(s =>
+    activeFilters.has(s.type) &&
+    (!effectiveOnlyParticipating() || !!s.treeInfo) &&
+    matchesSearch(s)
+  );
 }
 
 function renderCounts(){
+  const treeVisible = allSchools.filter(s => s.treeInfo && matchesSearch(s) && activeFilters.has(s.type));
+  const cntTreeEl = document.getElementById("cnt-tree");
+  if(cntTreeEl) cntTreeEl.textContent = `${treeVisible.length}개교`;
+
   Object.keys(TYPE_META).forEach(type=>{
     const list = allSchools.filter(s =>
-      s.type === type && (!searchTerm || s.name.includes(searchTerm))
+      s.type === type &&
+      (!effectiveOnlyParticipating() || !!s.treeInfo) &&
+      matchesSearch(s)
     );
     const n = list.length;
     const b = list.filter(s => (s.name || "").includes("분교")).length;
@@ -700,10 +888,6 @@ function renderCounts(){
       const matched = list.filter(s => s.office !== null);
       if(list.length > 0 && matched.length === 0){
         brkEl.innerHTML = `<span class="office-chip">⚠ 관할청 판별 불가(주소 확인 필요)</span>`;
-        console.warn(
-          `[${TYPE_META[type].label}] 주소 기반 관할청 매칭 실패 — 원본 주소 예시:`,
-          Array.from(new Set(list.slice(0, 10).map(s => s.address)))
-        );
       }else{
         brkEl.innerHTML = OFFICE_ORDER.map(key => {
           const officeList = list.filter(s => s.office === key);
@@ -719,9 +903,7 @@ function renderCounts(){
 function renderList(){
   const wrap = document.getElementById("listWrap");
   wrap.innerHTML = "";
-  let visible = allSchools.filter(s =>
-    activeFilters.has(s.type) && (!searchTerm || s.name.includes(searchTerm))
-  );
+  const visible = visibleSchools();
 
   if(visible.length === 0){
     wrap.innerHTML = `<div class="legend-note">표시할 학교가 없습니다.</div>`;
@@ -730,12 +912,21 @@ function renderList(){
 
   visible.forEach(school=>{
     const meta = TYPE_META[school.type];
+    const t = school.treeInfo;
     const item = document.createElement("div");
     item.className = "list-item";
+
+    let metaLine = school.address;
+    if(searchMode === "species" && t && searchTerm){
+      const hitCount = t.cumulative_species.filter(sp=>sp.includes(searchTerm)).length;
+      metaLine = `${school.address} · <span class="sp-hit">'${searchTerm}' 포함 종 ${hitCount}개</span>`;
+    }
+
     item.innerHTML = `
       <span class="tag" style="background:${meta.color}">${meta.label}</span>
       <div class="name" style="display:inline">${school.name}</div>
-      <div class="meta">${school.address}</div>
+      ${t ? `<span class="tree-badge">🌳 ${t.cumulative_species_count}종</span>` : ""}
+      <div class="meta">${metaLine}</div>
     `;
     item.addEventListener("click", ()=>{
       if(school.lat == null) return;
@@ -756,9 +947,37 @@ document.querySelectorAll('input[type="checkbox"][data-type]').forEach(cb=>{
     const type = cb.dataset.type;
     if(cb.checked) activeFilters.add(type); else activeFilters.delete(type);
     allSchools.filter(s=>s.type===type).forEach(applyVisibility);
+    renderCounts();
     renderList();
   });
 });
+
+document.getElementById("onlyParticipating").addEventListener("change", (e)=>{
+  onlyParticipating = e.target.checked;
+  allSchools.forEach(applyVisibility);
+  renderCounts();
+  renderList();
+});
+
+function setSearchMode(mode){
+  searchMode = mode;
+  document.getElementById("modeSchoolBtn").classList.toggle("active", mode === "school");
+  document.getElementById("modeSpeciesBtn").classList.toggle("active", mode === "species");
+  const input = document.getElementById("searchInput");
+  const hint = document.getElementById("searchHint");
+  if(mode === "species"){
+    input.placeholder = "수목 종명으로 검색 (예: 느티나무)";
+    hint.textContent = "학교숲사랑 참여교가 보유한 수목 종명을 검색합니다. 참여교만 표시됩니다.";
+  }else{
+    input.placeholder = "학교명으로 검색";
+    hint.textContent = "인천 전체 초·중·고 학교명을 검색합니다.";
+  }
+  allSchools.forEach(applyVisibility);
+  renderCounts();
+  renderList();
+}
+document.getElementById("modeSchoolBtn").addEventListener("click", ()=> setSearchMode("school"));
+document.getElementById("modeSpeciesBtn").addEventListener("click", ()=> setSearchMode("species"));
 
 document.getElementById("searchInput").addEventListener("input", (e)=>{
   searchTerm = e.target.value.trim();
