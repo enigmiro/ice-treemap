@@ -796,12 +796,26 @@ function focusSchool(school){
 // 말풍선(정보창) 안에 보여줄 수목 목록 박스의 최대 세로 높이(px).
 // 이 높이를 넘으면 자동으로 세로 스크롤이 생깁니다.
 const TREE_BOX_MAX_HEIGHT = 130;
+const TREE_BOX_MIN_WIDTH = 160; // 주소가 아주 짧아도 최소한의 너비는 보장
 
-let popupSeq = 0;
+// 주소 텍스트가 실제로 화면에서 차지하는 가로 폭(px)을, 지도 오버레이에 붙기 전에
+// 캔버스로 미리 계산합니다. (DOM에 붙은 뒤 offsetWidth로 재는 방식은 카카오맵
+// 오버레이가 언제 실제로 렌더링되는지 타이밍이 어긋나 실패할 수 있어 이 방식으로 대체)
+let _measureCanvas = null;
+function measureTextWidth(text, font){
+  if(!_measureCanvas) _measureCanvas = document.createElement("canvas");
+  const ctx = _measureCanvas.getContext("2d");
+  ctx.font = font;
+  return ctx.measureText(text).width;
+}
+
+function addressFont(){
+  // 주소 줄(font-size:12px)과 동일한 폰트로 측정해야 실제 렌더링 폭과 일치합니다.
+  return `12px ${getComputedStyle(document.body).fontFamily}`;
+}
 
 function buildInfoContent(school, meta, homeLink, telHomeLine){
   const t = school.treeInfo;
-  school.popupId = ++popupSeq; // 주소 요소 폭 측정을 위한 고유 id
   let treeSection = "";
 
   if(t){
@@ -810,11 +824,14 @@ function buildInfoContent(school, meta, homeLink, telHomeLine){
       .map(sp => `<span style="display:inline-block;background:var(--c-tree-light,#e6f1ea);color:#2f7d4f;border-radius:12px;padding:2px 8px;margin:2px 3px 3px 0;font-size:11px;white-space:nowrap;">${sp}</span>`)
       .join("");
 
+    const addrWidth = Math.ceil(measureTextWidth(school.address, addressFont())) + 2; // 약간의 여유
+    const boxWidth = Math.max(addrWidth, TREE_BOX_MIN_WIDTH);
+
     treeSection = `
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e4e1d8;">
         <div style="font-size:12px;font-weight:700;color:#2f7d4f;">🌳 학교숲사랑 참여 · ${years}</div>
         <div style="font-size:11.5px;color:#555;margin:2px 0 5px;">누적 보유 수종 <b>${t.cumulative_species_count}종</b></div>
-        <div id="treebox-${school.popupId}" style="width:100%;box-sizing:border-box;max-height:${TREE_BOX_MAX_HEIGHT}px;overflow-y:auto;border:1px solid #e4e1d8;border-radius:8px;padding:6px 7px;background:#fafaf7;">
+        <div style="width:${boxWidth}px;box-sizing:border-box;max-height:${TREE_BOX_MAX_HEIGHT}px;overflow-y:auto;border:1px solid #e4e1d8;border-radius:8px;padding:6px 7px;background:#fafaf7;">
           ${chips}
         </div>
       </div>`;
@@ -824,7 +841,7 @@ function buildInfoContent(school, meta, homeLink, telHomeLine){
     <div style="font-family:inherit;padding:10px 14px;">
       <div style="font-weight:700;font-size:14px;margin-bottom:4px;white-space:nowrap;">${school.name}${t ? ' <span style="color:#2f7d4f;">🌳</span>' : ''}</div>
       <div style="font-size:12px;color:#555;margin-bottom:2px;white-space:nowrap;">${meta.label}${school.found ? " · " + school.found : ""}</div>
-      <div id="addr-${school.popupId}" style="font-size:12px;color:#555;margin-bottom:2px;white-space:nowrap;">${school.address}</div>
+      <div style="font-size:12px;color:#555;margin-bottom:2px;white-space:nowrap;">${school.address}</div>
       ${telHomeLine}
       ${treeSection}
     </div>`;
@@ -865,18 +882,6 @@ function openInfo(school){
   activeOverlay.setContent(wrapped);
   activeOverlay.setPosition(new kakao.maps.LatLng(school.lat, school.lng));
   activeOverlay.setMap(map);
-
-  // 수목 목록 박스의 가로 크기를 학교 주소 줄의 실제 렌더링 길이에 맞춥니다.
-  // (주소가 짧은 학교는 박스도 좁게, 주소가 긴 학교는 박스도 넓게)
-  requestAnimationFrame(()=>{
-    const addrEl = document.getElementById(`addr-${school.popupId}`);
-    const boxEl = document.getElementById(`treebox-${school.popupId}`);
-    if(addrEl && boxEl){
-      const w = addrEl.offsetWidth;
-      const MIN_BOX_WIDTH = 160; // 주소가 아주 짧아도 최소한의 너비는 보장
-      if(w > 0) boxEl.style.width = Math.max(w, MIN_BOX_WIDTH) + "px";
-    }
-  });
 }
 
 function closeSchoolPopup(){
